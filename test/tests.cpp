@@ -1,0 +1,233 @@
+#include "engine.hpp"
+#include <cstdio>
+#include <string>
+#include <vector>
+
+using namespace vgo;
+
+struct Case { const char* keys; const char* want; };
+
+// Mặc định: oldStyleTone = true (hòa / thúy / khoẻ)
+static const std::vector<Case> CASES = {
+    // --- thanh cơ bản ---
+    {"as", "á"}, {"af", "à"}, {"ar", "ả"}, {"ax", "ã"}, {"aj", "ạ"},
+    // --- dấu phụ ---
+    {"aa", "â"}, {"ee", "ê"}, {"oo", "ô"},
+    {"aw", "ă"}, {"ow", "ơ"}, {"uw", "ư"}, {"w", "w"}, {"tuw", "tư"},
+    {"dd", "đ"},
+    // --- thanh + dấu phụ ---
+    {"aas", "ấ"}, {"aaf", "ầ"}, {"ees", "ế"}, {"oos", "ố"},
+    {"aws", "ắ"}, {"ows", "ớ"}, {"uws", "ứ"},
+    // --- từ thường ---
+    {"vieejt", "việt"}, {"tieengs", "tiếng"}, {"nguwowif", "người"},
+    {"ddaaus", "đấu"}, {"hoo", "hô"}, {"mej", "mẹ"},
+    {"chaof", "chào"}, {"ddi", "đi"}, {"ddepj", "đẹp"},
+    {"camr", "cảm"}, {"ows", "ớ"}, {"thuwowngr", "thưởng"},
+    // --- đặt dấu: nguyên âm có mũ/móc ưu tiên ---
+    {"uoongs", "uống"}, {"dduwowngf", "đường"}, {"giuwax", "giữa"},
+    {"khuyeenr", "khuyển"}, {"yeeu", "yêu"},
+    // --- qu / gi ---
+    {"quas", "quá"}, {"quys", "quý"}, {"quyeesn", "quyến"},
+    {"gif", "gì"}, {"giaf", "già"}, {"giuwowngf", "giường"},
+    // --- oa/oe/uy kiểu cũ (dấu về nguyên âm đầu) ---
+    {"hoaf", "hòa"}, {"khoer", "khỏe"}, {"thuys", "thúy"}, {"thuyr", "thủy"},
+    // --- dời dấu khi thêm phụ âm cuối ---
+    {"toansr", "toản"},  // t,o,a,n,s,r ? kiểm chuỗi dài
+    {"loanx", "loãn"}, {"toans", "toán"}, {"uons", "uốn"},
+    {"toasn", "toán"},  // gõ dấu trước phụ âm cuối -> phải dời
+    // --- 'w' gõ sau (sau nguyên âm sau / phụ âm cuối): áp lên cả cụm nguyên âm ---
+    {"cuarw", "cửa"}, {"cuawr", "cửa"}, {"muaw", "mưa"}, {"giuawx", "giữa"},
+    {"guiwr", "gửi"}, {"toiw", "tơi"}, {"cuuws", "cứu"},
+    {"nguoiwf", "người"}, {"cuoiwf", "cười"}, {"ruouwj", "rượu"}, {"huouw", "hươu"},
+    {"thuongwr", "thưởng"}, {"dduongwf", "đường"}, {"nuocws", "nước"}, {"dduocwj", "được"},
+    {"hoawcj", "hoặc"}, {"quaw", "quă"}, {"quawn", "quăn"},
+    // --- "uo"+w mở -> "uơ"; có chữ theo sau -> "ươ"; "qu" không nhận sừng ---
+    {"thuowr", "thuở"}, {"huow", "huơ"}, {"quowr", "quở"},
+    {"nguowif", "người"}, {"huowng", "hương"}, {"dduowcj", "được"},
+    {"uoww", "uoww"},   // gõ lại w -> bỏ sừng cả cặp + chữ thật
+    // --- mũ / đ không liền nhau ---
+    {"toio", "tôi"}, {"tiene", "tiên"}, {"tienge", "tiêng"}, {"vietej", "việt"},
+    {"muonos", "muốn"}, {"uyene", "uyên"}, {"caya", "cây"},
+    {"ngoeoj", "ngoẹo"}, {"khoeof", "khoèo"},   // vần "oeo" thật: 'o' là chữ thường
+    {"didd", "đi"}, {"Didd", "Đi"}, {"dduongwf", "đường"}, {"duongwfdd", "đường"},
+    {"did", "did"},     // 1 chữ d sau nguyên âm: giữ thô (tiếng Anh)
+    {"Cuarw", "Cửa"}, {"CUARW", "CỬA"},
+    // --- ép nguyên âm đôi theo chính tả (quên mũ/móc vẫn ra đúng) ---
+    {"tiengs", "tiếng"}, {"vietj", "việt"}, {"yeu", "yêu"}, {"hieur", "hiểu"},
+    {"giengs", "giếng"}, {"khuyen", "khuyên"}, {"tuyetj", "tuyệt"},
+    {"huwongs", "hướng"}, {"truwongf", "trường"}, {"ruwouj", "rượu"}, {"nuwowcs", "nước"},
+    {"muons", "muốn"}, {"cuocj", "cuộc"}, {"buon", "buôn"}, {"quocs", "quốc"},
+    {"tie", "tie"}, {"huwo", "hưo"}, {"thuo", "thuo"},   // âm tiết còn mở: để yên
+    {"tuoir", "tuỏi"},  // "uoi" mơ hồ (tuổi/người): không đoán
+    {"dyeing", "dyeing"}, {"yea", "yea"},                // không phải vần iê/yê: để yên
+    {"tieng", "tiêng"}, {"thuongwr", "thưởng"},          // 'w' gõ sau vẫn thắng uô
+    // --- gõ đúp phím điều khiển ---
+    {"aaa", "aa"},      // mũ (aa->â) gõ lần 3: revert -> "aa"
+    {"thijj", "thijj"}, // B (chuẩn Telex): double dấu = bỏ dấu + chữ thật -> "thij" thô; Backspace cứu
+    {"ddd", "ddd"},     // "dd" không phải tiền tố phụ âm đầu -> thô
+    {"aww", "aww"},     // "aw": coda 'w' không hợp lệ -> thô
+    // --- tiếng Anh lẫn lộn: phải GIỮ NGUYÊN (không mangle) ---
+    {"browser", "browser"}, {"file", "file"}, {"password", "password"},
+    {"video", "video"}, {"google", "google"},
+    {"internet", "internet"}, {"javascript", "javascript"}, {"email", "email"},
+    {"server", "server"}, {"debug", "debug"}, {"folder", "folder"},
+    {"the", "the"}, {"they", "they"},
+    // câu trộn Anh-Việt
+    {"guwir email cho sysadmin", "gửi email cho sysadmin"},
+    // --- giữ hoa ---
+    {"Tieengs", "Tiếng"}, {"Vieejt", "Việt"}, {"DDays", "Đáy"},
+    // --- nhiều từ (space commit) ---
+    {"tieengs vieejt", "tiếng việt"},
+    {"xin chaof banj", "xin chào bạn"},
+};
+
+int main() {
+    Config cfg; // oldStyleTone = true
+    int pass = 0, fail = 0;
+    for (auto& c : CASES) {
+        std::string got = typeString(c.keys, cfg);
+        bool ok = (got == c.want);
+        if (ok) ++pass;
+        else {
+            ++fail;
+            std::printf("FAIL  %-16s -> got [%s]  want [%s]\n", c.keys, got.c_str(), c.want);
+        }
+    }
+    // --- từ điển tiếng Anh + VN priority (nạp từ vào dict rồi kiểm) ---
+    dictAddWord("test");
+    dictAddWord("this");
+    dictAddWord("data");  // không dict: "data" khớp khuôn "tiene" -> "dât"
+    dictAddWord("cos");   // cố tình thêm để chắc VN_PRIORITY vẫn thắng
+    dictAddWord("been");  // "been" trong dict Anh...
+    vnAddWord("been");    // ...nhưng ép-Việt ưu tiên -> phải ra "bên"
+    const std::vector<Case> DCASES = {
+        {"test", "test"},   // trong dict -> giữ thô, không thành "tét"
+        {"this", "this"},   // -> không thành "thí"
+        {"data", "data"},   // mũ không liền nhau: từ điển giữ Anh
+        {"cos",  "có"},     // VN_PRIORITY: dù có trong dict vẫn ra "có"
+        {"browser", "browser"},  // vẫn bắt theo cấu trúc (không cần dict)
+        {"been", "bên"},    // ép-Việt thắng từ điển Anh
+    };
+    for (auto& c : DCASES) {
+        std::string got = typeString(c.keys, cfg);
+        if (got == c.want) ++pass;
+        else { ++fail; std::printf("FAIL(dict) %-10s -> got [%s]  want [%s]\n",
+                                   c.keys, got.c_str(), c.want); }
+    }
+
+    // --- ngữ cảnh: bigram + luật IN HOA (từ trước) ---
+    bigramAdd("it's", "been", true);   // thắng ép-Việt "been"
+    bigramAdd("xe", "bus", true);
+    bigramAdd("has", "been", true);    // tra theo phím thô: "has" đã hiện "há"
+    bigramAdd("tooi", "test", false);  // bigram Việt thắng từ điển Anh
+    const std::vector<Case> XCASES = {
+        {"it's been", "it's been"},
+        {"owr been",  "ở bên"},        // không có luật -> ép-Việt như cũ
+        {"ddi xe bus", "đi xe bus"},
+        {"cho con bus", "cho con bú"},
+        {"has been", "há been"},
+        {"tooi test", "tôi tét"},
+        {"xe, bus",   "xe, bú"},       // dấu câu cắt token: từ trước là "xe,"
+        {"mua NAS",   "mua NAS"},      // viết tắt giữa câu thường -> thô
+        {"NAS",       "NÁ"},           // đầu dòng: không có ngữ cảnh -> Việt
+        {"VIEETJ NAM VAF", "VIỆT NAM VÀ"},  // câu IN HOA -> vẫn Việt
+        {"mua COS",   "mua CÓ"},       // VN_PRIORITY thắng luật IN HOA
+        {"mua DDAAUF", "mua ĐẦU"},     // >4 chữ: không áp luật
+    };
+    // --- từ trước ra Anh -> từ mơ hồ (có trong cả ép-Việt lẫn từ điển Anh) theo Anh ---
+    dictAddWord("is", true); vnAddWord("is");   // base Anh + ép-Việt
+    dictAddWord("us", true); vnAddWord("us");
+    dictAddWord("thif"); vnAddWord("thif");     // Anh CÁ NHÂN (Esc nhầm) + ép-Việt
+    const std::vector<Case> MCASES = {
+        {"is", "í"}, {"us", "ú"},           // một mình: ép-Việt
+        {"xin is", "xin í"},               // sau từ Việt: vẫn Việt
+        {"this is", "this is"},            // sau từ Anh: Anh
+        {"for us", "for us"},
+        {"this is, us", "this is, us"},    // dấu câu không cắt mạch: "is," ra Anh -> "us" Anh
+        {"xin is, us", "xin í, ú"},
+        {"this cos", "this có"},           // VN_PRIORITY vẫn thắng
+        {"this tooi", "this tôi"},         // không có trong từ điển Anh: không ép
+        {"test thif", "test thì"},         // Anh cá nhân không đủ: luật chỉ theo base
+    };
+    for (auto& c : MCASES) {
+        std::string got = typeString(c.keys, cfg);
+        if (got == c.want) ++pass;
+        else { ++fail; std::printf("FAIL(prevEn) %-14s -> got [%s]  want [%s]\n",
+                                   c.keys, got.c_str(), c.want); }
+    }
+    for (auto& c : XCASES) {
+        std::string got = typeString(c.keys, cfg);
+        if (got == c.want) ++pass;
+        else { ++fail; std::printf("FAIL(ctx) %-14s -> got [%s]  want [%s]\n",
+                                   c.keys, got.c_str(), c.want); }
+    }
+
+    // --- tự sửa 1 lỗi gõ (mô hình LatinIME + từ điển âm tiết; nguồn: từ thật phải Esc ép tay) ---
+    vnLexLoadFile("data/vn-syllables.txt");   // chạy từ gốc repo (make test)
+    if (vnLexCount("không") == 0) { ++fail; std::printf("FAIL(typo) thiếu data/vn-syllables.txt\n"); }
+    dictAddWord("roof"); dictAddWord("warn");
+    const std::vector<Case> TCASES = {
+        // gõ đúp phụ âm (LatinIME INSERTION_COST_SAME_CHAR)
+        {"ccofn", "còn"}, {"nhhir", "nhỉ"}, {"rroofi", "rồi"}, {"thhasng", "tháng"},
+        {"nnafo", "nào"}, {"lluwu", "lưu"}, {"Ccofn", "Còn"}, {"hheest", "hết"},
+        // phím đầu chạm trượt sang phím kề (INSERTION_COST_PROXIMITY_CHAR)
+        {"jkhas", "khá"}, {"cghuwa", "chưa"}, {"rtreen", "trên"}, {"bnos", "nó"},
+        {"cvaf", "và"},
+        {"cvuj", "vụ"},          // vụ (26661) >> cụ (2030): tần suất quyết, không mơ hồ
+        // nguyên âm gõ sớm kẹp giữa phụ âm đầu
+        {"nahawns", "nhắn"},
+        {"tooi ccaafn lluwu", "tôi cần lưu"},
+        // KHÔNG sửa
+        {"thanjt", "thanjt"},    // phím lạc sau nguyên âm: thật? thạnh? -> để thô
+        {"alafm", "alafm"},      // nguyên âm thừa đầu từ: lẫn từ Anh ("emoji", "ether")
+        {"emoji", "emoji"}, {"ether", "ether"},
+        {"rthi", "rthi"},        // từ ngắn: điểm dưới ngưỡng 0.185
+        {"rroof", "rroof"},      // ứng viên "roof" là từ Anh
+        {"warns", "warns"},      // biến tố của từ Anh "warn"
+        {"xuoowsng", "xuoowsng"},// không xoá nửa cặp oo (đổi dấu -> "xướng" sai)
+        {"hurry", "hurry"}, {"lasso", "lasso"},  // đúp phím thanh sau nguyên âm = hoàn tác Telex
+        {"kohng", "kohng"},      // không sửa đảo phím (đưa 'w'/'s' ra sau nguyên âm -> dấu)
+        {"butt", "butt"}, {"abet", "abet"}, {"brats", "brats"}, {"sway", "sway"},
+        {"for", "for"},
+    };
+    for (auto& c : TCASES) {
+        std::string got = typeString(c.keys, cfg);
+        if (got == c.want) ++pass;
+        else { ++fail; std::printf("FAIL(typo) %-14s -> got [%s]  want [%s]\n",
+                                   c.keys, got.c_str(), c.want); }
+    }
+    {   // Esc = van hoàn tác: từ đã tự sửa lật về đúng phím thô
+        Engine e(cfg);
+        for (char ch : std::string("ccofn")) e.key(ch);
+        bool ok = e.display() == "còn" && !e.isShowingRaw();
+        e.forceRaw();
+        ok = ok && e.display() == "ccofn";
+        e.forceVN();
+        ok = ok && e.display() == "còn";
+        if (ok) ++pass;
+        else { ++fail; std::printf("FAIL(typo) Esc lật ccofn <-> còn\n"); }
+    }
+
+    // --- backspace: bỏ phím lỡ dư rồi DỰNG LẠI (không tụt mất dấu, không lệch buf/raw) ---
+    struct BkCase { const char* keys; int nback; const char* want; };
+    const std::vector<BkCase> BK = {
+        {"bijx",   1, "bị"},   // "bị" lỡ thêm 'x'->"bĩ"; backspace bỏ 'x' -> về "bị"
+        {"bijs",   1, "bị"},   // lỡ 's'->"bí"; backspace -> "bị"
+        {"bij",    1, "bi"},   // không dư: backspace bỏ phím dấu 'j' -> "bi" (keystroke chuẩn)
+        {"vieejt", 1, "việ"},  // "việt" backspace bỏ 't' -> "việ"
+        {"bijx",   2, "bi"},   // bỏ 'x'->"bị", bỏ 'j'->"bi" (peel từng phím)
+        {"bijx",   3, "b"},    // bỏ 'x','j','i' -> "b"
+    };
+    for (auto& c : BK) {
+        Engine e(cfg);
+        for (char ch : std::string(c.keys)) e.key(ch);
+        for (int i = 0; i < c.nback; ++i) e.backspace();
+        std::string got = e.display();
+        if (got == c.want) ++pass;
+        else { ++fail; std::printf("FAIL(bksp) %s x%d -> got [%s]  want [%s]\n",
+                                   c.keys, c.nback, got.c_str(), c.want); }
+    }
+
+    std::printf("\n%d passed, %d failed (%d total)\n", pass, fail, pass + fail);
+    return fail ? 1 : 0;
+}

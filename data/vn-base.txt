@@ -1,0 +1,16 @@
+# Mặt chữ tiếng Anh trùng từ Việt thường -> ép biến đổi tiếng Việt.
+# (ưu tiên hơn từ điển Anh; Esc lúc gõ vẫn lật được từng từ)
+barn
+dans
+hans
+sans
+been
+teen
+queen
+seen
+# Viết tắt chat (không nguyên âm -> cấu trúc âm tiết loại, phải ép): đc đt đk đh đg
+ddc
+ddt
+ddk
+ddh
+ddg
