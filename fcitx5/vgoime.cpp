@@ -5,6 +5,7 @@
 #include <fstream>
 #include <filesystem>
 
+#include <fcitx-config/iniparser.h>
 #include <fcitx/addoninstance.h>
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
@@ -141,12 +142,27 @@ VgoEngine::VgoEngine(Instance *instance)
       factory_([](InputContext &) { return new VgoState; }) {
     instance_->inputContextManager().registerProperty("vgoState", &factory_);
     loadDictOnce();
+    reloadConfig();
+}
+
+constexpr char kConfigFile[] = "conf/vgo.conf";
+
+void VgoEngine::reloadConfig() { readAsIni(config_, kConfigFile); }
+
+void VgoEngine::setConfig(const RawConfig &raw) {
+    config_.load(raw, true);
+    safeSaveAsIni(config_, kConfigFile);
+}
+
+// Nhãn trên khay: T = Telex, V = VNI.
+std::string VgoEngine::subModeLabelImpl(const InputMethodEntry &, InputContext &) {
+    return vniMode() ? "V" : "T";
 }
 
 // Áp engine.display() ra ô nhập: không-preedit (ghi-đè surrounding theo diff),
 // hoặc fallback preedit nếu app không hỗ trợ surrounding text.
 void VgoEngine::render(InputContext *ic, VgoState *state) {
-    std::string next = state->engine.display();
+    std::string next = state->display();
     // Chromium/Electron: surrounding-text xoá lỗi -> dùng preedit (else-branch).
     bool canCommit = ic->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
                      !isChromiumApp(ic->program());
@@ -177,7 +193,7 @@ void VgoEngine::render(InputContext *ic, VgoState *state) {
 }
 
 void VgoEngine::showPreedit(InputContext *ic, VgoState *state) {
-    std::string s = state->engine.display();
+    std::string s = state->display();
     Text preedit;
     preedit.append(s, TextFormatFlag::Underline);
     preedit.setCursor(static_cast<int>(s.size()));
@@ -195,21 +211,25 @@ void VgoEngine::showPreedit(InputContext *ic, VgoState *state) {
 void VgoEngine::finalize(InputContext *ic, VgoState *state, uint32_t boundary) {
     // Chốt bản tự sửa bằng space/dấu câu -> cho phép Backspace hoàn tác (chỉ chế độ
     // surrounding; preedit = Chromium, xoá text đã commit không tin được).
-    state->canRevert = boundary && !state->usingPreedit && !state->engine.empty() &&
-                       state->engine.isCorrected();
+    state->canRevert = !state->vni && boundary && !state->usingPreedit &&
+                       !state->engine.empty() && state->engine.isCorrected();
     if (state->canRevert) {
         state->revRaw = state->engine.raw();
         state->revShown = state->engine.display();
         state->revSep = utf8::UCS4ToUTF8(boundary);
     }
-    if (state->usingPreedit && !state->engine.empty()) {
-        ic->commitString(state->engine.display());
+    if (state->usingPreedit && !state->empty()) {
+        ic->commitString(state->display());
         ic->inputPanel().reset();
         ic->updatePreedit();
         ic->updateUserInterface(UserInterfaceComponent::InputPanel);
     }
-    state->engine.endWord(boundary);
-    if (!boundary) state->engine.clearContext();
+    if (state->vni) {
+        state->vniEngine.reset();   // VNI không có ngữ cảnh / tự học
+    } else {
+        state->engine.endWord(boundary);
+        if (!boundary) state->engine.clearContext();
+    }
     state->shown.clear();
     state->usingPreedit = false;
 }
@@ -249,9 +269,24 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
     // Hoàn tác tự sửa chỉ dành cho Backspace NGAY sau khi chốt
     if (!key.check(FcitxKey_BackSpace)) state->canRevert = false;
 
+    // Vừa đổi kiểu gõ trong cài đặt -> chốt từ đang gõ dở bằng kiểu cũ.
+    if (state->vni != vniMode()) {
+        finalize(ic, state);
+        state->engine.clearContext();
+        state->vni = vniMode();
+    }
+
     // Nút LẬT 2 CHIỀU (Esc khi đang gõ dở): Anh <-> Việt + tự nhớ.
     // Dùng phím không-modifier vì app nuốt tổ hợp Ctrl trước khi tới vgo.
     if (key.check(FcitxKey_Escape)) {
+        if (state->vni) {           // VNI: chỉ lật từ này, không ghi nhớ
+            if (!state->vniEngine.empty()) {
+                state->vniEngine.flip();
+                render(ic, state);
+                keyEvent.filterAndAccept();
+            }
+            return;
+        }
         if (!state->engine.empty()) {
             std::string word = state->engine.raw();
             const std::string &prev = state->engine.prev();  // rỗng = đầu dòng / mất ngữ cảnh
@@ -283,6 +318,14 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
 
     // Backspace
     if (key.check(FcitxKey_BackSpace)) {
+        if (state->vni) {
+            if (state->vniEngine.empty()) return;
+            state->vniEngine.backspace();
+            if (state->usingPreedit) showPreedit(ic, state);
+            else render(ic, state);
+            keyEvent.filterAndAccept();
+            return;
+        }
         if (state->engine.empty()) {
             if (revertCorrection(ic, state)) {
                 keyEvent.filterAndAccept();
@@ -305,10 +348,20 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
         return;
     }
 
-    // Chữ cái a-z / A-Z -> nạp engine.
+    // Chữ cái a-z / A-Z -> nạp engine. VNI: số (hàng phím trên, không phải bàn phím
+    // số) chỉ nạp khi đang gõ dở một từ — số đứng đầu ("2026") là số thường.
     uint32_t code = Key::keySymToUnicode(key.sym());
     bool isLetter = (code >= 'a' && code <= 'z') || (code >= 'A' && code <= 'Z');
-    if (isLetter) {
+    if (state->vni) {
+        bool isKeypad = key.sym() >= FcitxKey_KP_Space && key.sym() <= FcitxKey_KP_9;
+        bool isDigit = code >= '0' && code <= '9' && !isKeypad && !state->vniEngine.empty();
+        if (isLetter || isDigit) {
+            state->vniEngine.key(static_cast<char>(code));
+            render(ic, state);
+            keyEvent.filterAndAccept();
+            return;
+        }
+    } else if (isLetter) {
         state->engine.key(static_cast<char>(code));
         render(ic, state);
         keyEvent.filterAndAccept();
@@ -325,6 +378,7 @@ void VgoEngine::reset(const InputMethodEntry &, InputContextEvent &event) {
     auto *state = ic->propertyFor(&factory_);
     state->engine.reset();
     state->engine.clearContext();
+    state->vniEngine.reset();
     state->shown.clear();
     state->usingPreedit = false;
     ic->inputPanel().reset();

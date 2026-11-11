@@ -1,4 +1,4 @@
-# Cài đặt + sự cố (chung cho vgo và vgo-vni)
+# Cài đặt + sự cố vgo (Telex / VNI)
 
 Bộ gõ chỉ chạy trên **Linux có fcitx5**. Bản build sẵn trong `bin/` làm trên
 Ubuntu 24.04 (GNOME, fcitx5 5.1.7); máy khác thì build từ source (xem `HUONG-DAN.md`).
@@ -27,6 +27,10 @@ fcitx5 -r -d        # khởi động lại fcitx5
 fcitx5-configtool   # Input Method -> bỏ tick "Only Show Current Language"
                     # -> tìm "vgo" -> thêm vào cột bên trái -> Apply
 ```
+
+Chọn **Telex hay VNI**: fcitx5-configtool -> chọn "vgo" ở cột trái -> nút cấu hình (bánh
+răng) -> "Kiểu gõ". Đổi xong có hiệu lực ngay, không cần khởi động lại. Nhãn trên khay:
+`T` = Telex, `V` = VNI.
 
 Chọn bộ gõ: bấm biểu tượng fcitx5 trên thanh hệ thống, hoặc dùng phím tắt — xem / đổi trong
 fcitx5-configtool -> Global Options -> Hotkey ("Trigger Input Method" = bật/tắt,

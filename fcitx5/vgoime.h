@@ -1,4 +1,4 @@
-// vgo — fcitx5 input method addon (bọc engine Telex thuần).
+// vgo — fcitx5 input method addon (bọc engine Telex + VNI thuần; chọn kiểu gõ trong cài đặt).
 // Chế độ chính: KHÔNG preedit — commit thẳng + xoá-ghi-đè tại chỗ bằng
 // surrounding text (giống UniKey/Lotus, không phá autofill). Tối ưu remote:
 // in-process, ghi-đè theo diff (chỉ phần đuôi đổi), tự track ký tự đã commit.
@@ -8,6 +8,9 @@
 
 #include <string>
 
+#include <fcitx-config/configuration.h>
+#include <fcitx-config/enum.h>
+#include <fcitx-utils/i18n.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
 #include <fcitx/inputcontextproperty.h>
@@ -15,11 +18,25 @@
 #include <fcitx/instance.h>
 
 #include "engine.hpp"
+#include "vni.hpp"
+
+// Kiểu gõ, chọn trong fcitx5-configtool (lưu ở ~/.config/fcitx5/conf/vgo.conf).
+enum class VgoMethod { Telex, VNI };
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(VgoMethod, N_("Telex"), N_("VNI"));
+
+FCITX_CONFIGURATION(
+    VgoConfig,
+    fcitx::OptionWithAnnotation<VgoMethod, VgoMethodI18NAnnotation> method{
+        this, "InputMethod", "Kiểu gõ", VgoMethod::Telex};);
 
 // Trạng thái soạn thảo riêng từng ô nhập.
 class VgoState : public fcitx::InputContextProperty {
 public:
-    vgo::Engine engine;
+    vgo::Engine engine;         // Telex
+    vgo::VniEngine vniEngine;   // VNI
+    bool vni = false;           // kiểu gõ của từ đang gõ (đổi cài đặt giữa chừng -> chốt từ cũ)
+    bool empty() const { return vni ? vniEngine.empty() : engine.empty(); }
+    std::string display() const { return vni ? vniEngine.display() : engine.display(); }
     std::string shown;          // text đã commit cho từ đang gõ (chế độ surrounding)
     bool usingPreedit = false;  // true nếu ô này phải fallback preedit
     // Từ vừa chốt là bản tự sửa -> Backspace NGAY sau đó trả lại phím thô
@@ -37,6 +54,12 @@ public:
     void reset(const fcitx::InputMethodEntry &entry,
                fcitx::InputContextEvent &event) override;
 
+    const fcitx::Configuration *getConfig() const override { return &config_; }
+    void setConfig(const fcitx::RawConfig &raw) override;
+    void reloadConfig() override;
+    std::string subModeLabelImpl(const fcitx::InputMethodEntry &,
+                                 fcitx::InputContext &) override;
+
 private:
     void render(fcitx::InputContext *ic, VgoState *state);       // áp display() ra ô nhập
     void showPreedit(fcitx::InputContext *ic, VgoState *state);  // fallback
@@ -44,7 +67,10 @@ private:
                   uint32_t boundary = 0);                        // chốt từ + dọn
     bool revertCorrection(fcitx::InputContext *ic, VgoState *state);  // Backspace hoàn tác
 
+    bool vniMode() const { return *config_.method == VgoMethod::VNI; }
+
     fcitx::Instance *instance_;
+    VgoConfig config_;
     fcitx::FactoryFor<VgoState> factory_;
 };
 
