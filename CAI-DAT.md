@@ -37,6 +37,18 @@ fcitx5-configtool -> Global Options -> Hotkey ("Trigger Input Method" = bật/t�
 "Enumerate Input Method" = chuyển giữa các bộ gõ đã thêm).
 Gỡ: `./uninstall.sh` (chỉ gỡ bộ gõ của gói này).
 
+### Tự học (lưu ở `~/.config/vgo/`, sửa tay được)
+
+| Học gì | Khi nào | File |
+|---|---|---|
+| Lật Anh/Việt (Telex) | Esc khi đang gõ dở | `words.txt`, `vn-words.txt`, `bigram.txt` |
+| Lật thô/Việt (VNI) | Esc khi đang gõ dở từ có số (`a4` -> `ã`) | `vni-raw.txt`, `vni-vn.txt` |
+| Riêng từng app | Esc như trên: app nhớ lựa chọn của nó, thắng lựa chọn chung | `apps/<tên app>.txt` |
+| Lỗi gõ quen tay (Telex) | Gõ ra chữ không phải tiếng Việt, xoá rồi gõ lại đúng. Đủ 2 lần thì tự sửa | `typos.txt` (mỗi dòng 1 lần) |
+
+Lựa chọn chung = lần Esc gần nhất ở bất kỳ app nào. Học sai: xoá dòng trong file rồi
+`pkill -x fcitx5` (fcitx5 tự chạy lại) để nạp lại.
+
 ## 3. Sự cố thường gặp
 
 | Triệu chứng | Nguyên nhân / cách xử |

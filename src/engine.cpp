@@ -1,4 +1,5 @@
 #include "engine.hpp"
+#include "learn.hpp"
 #include "viet.hpp"
 #include <vector>
 #include <algorithm>
@@ -355,6 +356,17 @@ std::string Engine::correction() const {
     if (raw_ == corrRaw_) return corrOut_;
     corrRaw_ = raw_;
     corrOut_.clear();
+    // Lỗi gõ quen tay của chính người dùng (đã học) -> sửa luôn, thắng mô hình chung.
+    std::string mine = typoLookup(raw_);
+    if (!mine.empty()) {
+        if (std::isupper((unsigned char)raw_[0])) mine[0] = (char)std::toupper((unsigned char)mine[0]);
+        Engine e(cfg_);
+        for (char c : mine) e.key(c);
+        if (e.plausible()) {
+            corrOut_ = e.preedit();
+            return corrOut_;
+        }
+    }
     const std::string& r = raw_;
     int n = (int)r.size(), caps = 0;
     for (char c : r) {
@@ -561,6 +573,63 @@ int bigramLookup(const std::string& prev, const std::string& raw) {
     return it->second ? 1 : -1;
 }
 
+// ================= Lỗi gõ riêng (tự học) =================
+namespace {
+std::unordered_map<std::string, std::unordered_map<std::string, int>>& typoMap() {
+    static std::unordered_map<std::string, std::unordered_map<std::string, int>> m;
+    return m;   // phím sai -> (phím đúng -> số lần gặp)
+}
+// Khoảng cách sửa (Damerau: thêm / bớt / thay / đảo 2 phím kề)
+int editDistance(const std::string& a, const std::string& b) {
+    int n = (int)a.size(), m = (int)b.size();
+    std::vector<std::vector<int>> d(n + 1, std::vector<int>(m + 1));
+    for (int i = 0; i <= n; ++i) d[i][0] = i;
+    for (int j = 0; j <= m; ++j) d[0][j] = j;
+    for (int i = 1; i <= n; ++i)
+        for (int j = 1; j <= m; ++j) {
+            d[i][j] = std::min({d[i-1][j] + 1, d[i][j-1] + 1,
+                                d[i-1][j-1] + (a[i-1] != b[j-1])});
+            if (i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1])
+                d[i][j] = std::min(d[i][j], d[i-2][j-2] + 1);
+        }
+    return d[n][m];
+}
+bool allAlpha(const std::string& s) {
+    for (char c : s) if (!std::isalpha((unsigned char)c)) return false;
+    return !s.empty();
+}
+} // namespace
+
+// Chỉ học khi phím sai và phím đúng gần nhau (<= 2 phép sửa): gõ lại một từ khác hẳn
+// là đổi ý, không phải lỗi gõ.
+bool typoLearnable(const std::string& bad, const std::string& good) {
+    std::string b = lower(bad), g = lower(good);
+    if (b.size() < 2 || g.size() < 2 || b == g || !allAlpha(b) || !allAlpha(g)) return false;
+    return editDistance(b, g) <= 2;
+}
+void typoNote(const std::string& bad, const std::string& good) {
+    if (typoLearnable(bad, good)) ++typoMap()[lower(bad)][lower(good)];
+}
+void typoLoadFile(const std::string& path) {
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        std::istringstream in(line);
+        std::string bad, good;
+        if (in >> bad >> good) typoNote(bad, good);
+    }
+}
+std::string typoLookup(const std::string& bad) {
+    auto it = typoMap().find(lower(bad));
+    if (it == typoMap().end()) return "";
+    std::string best;
+    int bestN = 0;
+    for (auto& [good, n] : it->second)
+        if (n > bestN || (n == bestN && good < best)) { best = good; bestN = n; }
+    return bestN >= TYPO_MIN ? best : "";
+}
+
 namespace {
 // Từ IN HOA toàn bộ, ngắn (2–4 chữ): "NAS", "AWS"
 bool isShortAllCaps(const std::string& s) {
@@ -598,6 +667,7 @@ bool Engine::isShowingRaw() const {
     int b = bigramLookup(prev_, low);                    // ngữ cảnh: "xe bus", "it's been"
     if (!b && prevRaw_ != prev_) b = bigramLookup(prevRaw_, low);  // "has" đã hiện "há"
     if (b) return b > 0;
+    if (int a = appGet(app_, "telex", low)) return a > 0;  // Esc riêng của app này
     if (VN_PRIORITY.count(low)) return false;
     // Từ trước ra Anh + từ này có trong từ điển Anh BASE -> theo Anh, thắng ép-Việt:
     // "is" một mình -> í, nhưng "this is"/"for us" -> Anh. (Không làm chiều ngược:

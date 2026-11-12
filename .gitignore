@@ -4,6 +4,7 @@ dist/
 vgo-test
 vgo-cli
 vgo-vni-cli
+vni-test
 mklex
 *.o
 *.so

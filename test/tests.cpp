@@ -1,4 +1,5 @@
 #include "engine.hpp"
+#include "learn.hpp"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -206,6 +207,65 @@ int main() {
         ok = ok && e.display() == "còn";
         if (ok) ++pass;
         else { ++fail; std::printf("FAIL(typo) Esc lật ccofn <-> còn\n"); }
+    }
+
+    // --- lỗi gõ RIÊNG (tự học): gặp đủ TYPO_MIN lần mới tự sửa ---
+    {
+        auto expect = [&](const char* keys, const char* want, const char* tag) {
+            std::string got = typeString(keys, cfg);
+            if (got == want) ++pass;
+            else { ++fail; std::printf("FAIL(mytypo:%s) %s -> got [%s]  want [%s]\n",
+                                       tag, keys, got.c_str(), want); }
+        };
+        expect("kohng", "kohng", "chưa học");      // mô hình chung không sửa đảo phím
+        typoNote("kohng", "khoong");
+        expect("kohng", "kohng", "1 lần");         // 1 lần = lỡ tay, chưa sửa
+        typoNote("kohng", "khoong");
+        expect("kohng", "không", "2 lần");         // thói quen -> sửa
+        expect("Kohng", "Không", "hoa");
+        expect("tooi kohng ddi", "tôi không đi", "câu");
+        if (typoLearnable("kohng", "ddi") || typoLearnable("ab", "ab") || typoLearnable("h264", "ha"))
+            { ++fail; std::printf("FAIL(mytypo) typoLearnable nhận cặp không phải lỗi gõ\n"); }
+        else ++pass;
+        if (!typoLearnable("kohng", "khoong")) { ++fail; std::printf("FAIL(mytypo) kohng/khoong\n"); }
+        else ++pass;
+        Engine e(cfg);                             // Esc vẫn lật về đúng phím thô
+        for (char ch : std::string("kohng")) e.key(ch);
+        e.forceRaw();
+        if (e.display() == "kohng") ++pass;
+        else { ++fail; std::printf("FAIL(mytypo) Esc -> [%s]\n", e.display().c_str()); }
+    }
+
+    // --- nhớ riêng từng app: Esc của app thắng lựa chọn chung ---
+    {
+        auto typeIn = [&](const char* app, const char* keys) {
+            Engine e(cfg);
+            e.setApp(app);
+            for (char ch : std::string(keys)) e.key(ch);
+            return e.display();
+        };
+        struct AppCase { const char* app; const char* keys; const char* want; };
+        appSet("konsole", "telex", "mos", 1);      // terminal: giữ "mos"
+        appSet("slack", "telex", "test", -1);      // chat: "test" ra Việt dù có trong từ điển Anh
+        const std::vector<AppCase> ACASES = {
+            {"konsole", "mos", "mos"}, {"slack", "mos", "mó"}, {"", "mos", "mó"},
+            {"slack", "test", "tét"}, {"konsole", "test", "test"}, {"", "test", "test"},
+            {"konsole", "MOS", "MOS"},             // không phân biệt hoa/thường
+        };
+        for (auto& c : ACASES) {
+            std::string got = typeIn(c.app, c.keys);
+            if (got == c.want) ++pass;
+            else { ++fail; std::printf("FAIL(app) [%s] %s -> got [%s]  want [%s]\n",
+                                       c.app, c.keys, got.c_str(), c.want); }
+        }
+        Engine e(cfg);                             // bigram (ngữ cảnh) vẫn thắng lựa chọn của app
+        e.setApp("konsole");
+        appSet("konsole", "telex", "bus", -1);
+        for (char ch : std::string("xe")) e.key(ch);
+        e.endWord(' ');
+        for (char ch : std::string("bus")) e.key(ch);
+        if (e.display() == "bus") ++pass;
+        else { ++fail; std::printf("FAIL(app) bigram xe bus -> [%s]\n", e.display().c_str()); }
     }
 
     // --- backspace: bỏ phím lỡ dư rồi DỰNG LẠI (không tụt mất dấu, không lệch buf/raw) ---

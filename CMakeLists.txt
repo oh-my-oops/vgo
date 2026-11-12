@@ -24,6 +24,7 @@ add_library(vgo SHARED
     src/engine.cpp
     src/vni.cpp
     src/viet.cpp
+    src/learn.cpp
     fcitx5/vgoime.cpp
 )
 set_target_properties(vgo PROPERTIES PREFIX "lib")

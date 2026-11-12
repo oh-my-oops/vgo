@@ -4,6 +4,9 @@
 #include <cstdlib>      // getenv
 #include <fstream>
 #include <filesystem>
+#include <set>
+
+#include "learn.hpp"
 
 #include <fcitx-config/iniparser.h>
 #include <fcitx/addoninstance.h>
@@ -56,6 +59,15 @@ std::string cfgDir() {
 std::string userDictPath()   { return cfgDir() + "/words.txt"; }     // học: tiếng Anh
 std::string userVNDictPath() { return cfgDir() + "/vn-words.txt"; }  // học: ép tiếng Việt
 std::string userBigramPath() { return cfgDir() + "/bigram.txt"; }    // bigram cá nhân (sửa tay)
+std::string userTypoPath()   { return cfgDir() + "/typos.txt"; }     // lỗi gõ riêng: "sai đúng"
+std::string vniRawPath()     { return cfgDir() + "/vni-raw.txt"; }   // VNI Esc: giữ thô
+std::string vniVNPath()      { return cfgDir() + "/vni-vn.txt"; }    // VNI Esc: ra Việt
+// File riêng của app: ~/.config/vgo/apps/<tên chương trình>.txt
+std::string appPath(const std::string &app) {
+    std::string name;
+    for (char c : app) name += (std::isalnum((unsigned char)c) || c == '.' || c == '-') ? c : '_';
+    return cfgDir() + "/apps/" + name + ".txt";
+}
 
 // App nền Chromium/Electron (Chrome, VS Code, Slack…) cài đặt surrounding-text
 // xoá lỗi -> phải dùng preedit cho chúng.
@@ -78,6 +90,25 @@ void loadDictOnce() {
     vgo::vnLexLoadFile("/usr/share/vgo/vn-syllables.txt");  // âm tiết + tần suất: tự sửa gõ nhầm
     vgo::bigramLoadFile("/usr/share/vgo/bigram-base.txt");  // ngữ cảnh từ trước: base
     vgo::bigramLoadFile(userBigramPath());                  // ngữ cảnh: lớp cá nhân
+    vgo::typoLoadFile(userTypoPath());                      // lỗi gõ riêng (tự học)
+    vgo::vniLoadFile(vniRawPath(), true);                   // VNI Esc: giữ thô
+    vgo::vniLoadFile(vniVNPath(), false);                   // VNI Esc: ra Việt
+}
+
+// Nạp file riêng của app lần đầu gặp app đó.
+void loadAppOnce(const std::string &app) {
+    static std::set<std::string> loaded;
+    if (app.empty() || !loaded.insert(app).second) return;
+    vgo::appLoadFile(app, appPath(app));
+}
+// Esc trong app: nhớ riêng cho app (thắng lựa chọn chung khi các app chọn khác nhau).
+void learnApp(const std::string &app, const char *kind, const std::string &w, bool keepRaw) {
+    if (app.empty() || w.size() < 2) return;
+    vgo::appSet(app, kind, w, keepRaw ? 1 : -1);
+    try {
+        std::filesystem::create_directories(std::filesystem::path(appPath(app)).parent_path());
+    } catch (...) {}
+    vgo::appSaveFile(app, appPath(app));
 }
 
 void appendLine(const std::string &path, const std::string &w) {
@@ -133,6 +164,27 @@ void learnBigram(std::string prev, std::string w, bool english) {
     if (w.size() < 2 || vgo::bigramLookup(prev, w) == (english ? 1 : -1)) return;
     vgo::bigramAdd(prev, w, english);
     appendLine(userBigramPath(), prev + " " + w + (english ? " en" : " vn"));
+}
+
+// VNI Esc: nhớ chung (2 file, lần lật gần nhất thắng). Chỉ từ có số mới đáng nhớ —
+// VNI không có số thì chữ ra y như phím gõ.
+void learnVni(std::string w, bool keepRaw) {
+    for (char &c : w) c = (char)std::tolower((unsigned char)c);
+    if (w.size() < 2 || w.find_first_of("0123456789") == std::string::npos) return;
+    if (vgo::vniLookup(w) == (keepRaw ? 1 : -1)) return;
+    vgo::vniLearn(w, keepRaw);
+    removeLine(keepRaw ? vniVNPath() : vniRawPath(), w);
+    appendLine(keepRaw ? vniRawPath() : vniVNPath(), w);
+}
+
+// Xoá từ không ra tiếng Việt rồi gõ lại thành âm tiết đúng -> ghi 1 lần gặp lỗi gõ.
+void noteTypo(const std::string &bad, const std::string &good) {
+    if (!vgo::typoLearnable(bad, good)) return;
+    std::string b = bad, g = good;
+    for (char &c : b) c = (char)std::tolower((unsigned char)c);
+    for (char &c : g) c = (char)std::tolower((unsigned char)c);
+    vgo::typoNote(b, g);
+    appendLine(userTypoPath(), b + " " + g);
 }
 
 } // namespace
@@ -224,8 +276,13 @@ void VgoEngine::finalize(InputContext *ic, VgoState *state, uint32_t boundary) {
         ic->updatePreedit();
         ic->updateUserInterface(UserInterfaceComponent::InputPanel);
     }
+    // Vừa xoá một từ không ra tiếng Việt rồi gõ lại thành âm tiết đúng -> ghi lỗi gõ riêng.
+    if (!state->vni && !state->badRaw.empty() && !state->engine.empty() &&
+        !state->engine.isShowingRaw() && state->engine.complete())
+        noteTypo(state->badRaw, state->engine.raw());
+    state->badRaw.clear();
     if (state->vni) {
-        state->vniEngine.reset();   // VNI không có ngữ cảnh / tự học
+        state->vniEngine.reset();   // VNI không có ngữ cảnh
     } else {
         state->engine.endWord(boundary);
         if (!boundary) state->engine.clearContext();
@@ -269,6 +326,12 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
     // Hoàn tác tự sửa chỉ dành cho Backspace NGAY sau khi chốt
     if (!key.check(FcitxKey_BackSpace)) state->canRevert = false;
 
+    // App đang gõ: lựa chọn Esc riêng của app thắng lựa chọn chung.
+    const std::string &app = ic->program();
+    loadAppOnce(app);
+    state->engine.setApp(app);
+    state->vniEngine.setApp(app);
+
     // Vừa đổi kiểu gõ trong cài đặt -> chốt từ đang gõ dở bằng kiểu cũ.
     if (state->vni != vniMode()) {
         finalize(ic, state);
@@ -279,14 +342,21 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
     // Nút LẬT 2 CHIỀU (Esc khi đang gõ dở): Anh <-> Việt + tự nhớ.
     // Dùng phím không-modifier vì app nuốt tổ hợp Ctrl trước khi tới vgo.
     if (key.check(FcitxKey_Escape)) {
-        if (state->vni) {           // VNI: chỉ lật từ này, không ghi nhớ
+        if (state->vni) {           // VNI: lật từ này + tự nhớ (chung và riêng app)
             if (!state->vniEngine.empty()) {
-                state->vniEngine.flip();
+                bool wasRaw = state->vniEngine.isShowingRaw();
+                std::string word = state->vniEngine.raw();
+                learnVni(word, !wasRaw);
+                if (word.find_first_of("0123456789") != std::string::npos)
+                    learnApp(app, "vni", word, !wasRaw);
+                // Từ đã học có thể đã tự lật; chưa thì lật tay cho từ đang gõ.
+                if (state->vniEngine.isShowingRaw() == wasRaw) state->vniEngine.flip();
                 render(ic, state);
                 keyEvent.filterAndAccept();
             }
             return;
         }
+        state->badRaw.clear();      // Esc = người gõ tự quyết, không học lỗi gõ từ từ này
         if (!state->engine.empty()) {
             std::string word = state->engine.raw();
             const std::string &prev = state->engine.prev();  // rỗng = đầu dòng / mất ngữ cảnh
@@ -297,10 +367,14 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
                 bool keep = state->engine.plausible() ||
                             word.find_first_of("aeiouyAEIOUY") == std::string::npos;
                 state->engine.forceVN();
-                if (keep) { if (prev.empty()) learnVN(word); else learnBigram(prev, word, false); }
+                if (keep) {
+                    if (prev.empty()) { learnVN(word); learnApp(app, "telex", word, false); }
+                    else learnBigram(prev, word, false);
+                }
             } else {                              // đang ra Việt -> lật sang Anh
                 state->engine.forceRaw();
-                if (prev.empty()) learnEnglish(word); else learnBigram(prev, word, true);
+                if (prev.empty()) { learnEnglish(word); learnApp(app, "telex", word, true); }
+                else learnBigram(prev, word, true);
             }
             render(ic, state);
             keyEvent.filterAndAccept();
@@ -327,6 +401,7 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
             return;
         }
         if (state->engine.empty()) {
+            state->badRaw.clear();         // xoá lấn sang chữ đã chốt: đang sửa chỗ khác
             if (revertCorrection(ic, state)) {
                 keyEvent.filterAndAccept();
                 return;
@@ -334,6 +409,11 @@ void VgoEngine::keyEvent(const InputMethodEntry &, KeyEvent &keyEvent) {
             state->engine.clearContext();  // app xoá chữ đã chốt -> ngữ cảnh không còn đúng
             return;
         }
+        // Bắt đầu xoá một từ không ra tiếng Việt (không phải bản tự sửa) -> nhớ phím thô
+        // để nếu gõ lại thành âm tiết đúng thì học lỗi gõ (xem finalize()).
+        if (state->badRaw.empty() && state->engine.raw().size() >= 2 &&
+            state->engine.isShowingRaw() && !state->engine.plausible())
+            state->badRaw = state->engine.raw();
         if (state->usingPreedit) {
             state->engine.backspace();
             showPreedit(ic, state);
@@ -379,6 +459,7 @@ void VgoEngine::reset(const InputMethodEntry &, InputContextEvent &event) {
     state->engine.reset();
     state->engine.clearContext();
     state->vniEngine.reset();
+    state->badRaw.clear();
     state->shown.clear();
     state->usingPreedit = false;
     ic->inputPanel().reset();

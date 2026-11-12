@@ -43,6 +43,9 @@ public:
     // (như LatinIME InputLogic.revertCommit). Phím khác bất kỳ -> hết hiệu lực.
     bool canRevert = false;
     std::string revRaw, revShown, revSep;
+    // Phím thô của từ KHÔNG ra tiếng Việt lúc người gõ bắt đầu xoá nó (Telex). Gõ lại
+    // thành âm tiết đúng rồi chốt -> ghi 1 lần lỗi gõ riêng (xem vgo::typoNote).
+    std::string badRaw;
 };
 
 class VgoEngine : public fcitx::InputMethodEngineV2 {

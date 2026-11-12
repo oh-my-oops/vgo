@@ -1,6 +1,9 @@
 #include "vni.hpp"
+#include "learn.hpp"
 #include "viet.hpp"
 #include <cctype>
+#include <fstream>
+#include <unordered_map>
 #include <vector>
 
 namespace vgo {
@@ -257,6 +260,12 @@ bool VniEngine::isShowingRaw() const {
         bool closed = end >= 0 && end < (int)buf_.size() - 1;
         raw = !plausible(buf_) || (closed && !complete(buf_, cfg_.oldStyleTone));
     }
+    // Đã từng Esc từ này: riêng app này trước, rồi tới lựa chọn chung.
+    std::string low = raw_;
+    for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
+    int learned = appGet(app_, "vni", low);
+    if (!learned) learned = vniLookup(low);
+    if (learned) raw = learned > 0;
     return flipped_ ? !raw : raw;
 }
 
@@ -265,6 +274,34 @@ std::string VniEngine::display() const {
     std::string out;
     for (char32_t c : spellFix(buf_, cfg_.oldStyleTone)) encodeOne(out, c);
     return out;
+}
+
+namespace {
+std::unordered_map<std::string, bool>& vniLearned() {   // phím thô -> giữ thô?
+    static std::unordered_map<std::string, bool> m;
+    return m;
+}
+std::string lowerStr(std::string s) {
+    for (char& c : s) c = (char)std::tolower((unsigned char)c);
+    return s;
+}
+} // namespace
+
+void vniLearn(const std::string& raw, bool keepRaw) {
+    if (!raw.empty()) vniLearned()[lowerStr(raw)] = keepRaw;
+}
+void vniLoadFile(const std::string& path, bool keepRaw) {
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line)) {
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        if (!line.empty() && line[0] != '#') vniLearn(line, keepRaw);
+    }
+}
+int vniLookup(const std::string& raw) {
+    auto it = vniLearned().find(lowerStr(raw));
+    if (it == vniLearned().end()) return 0;
+    return it->second ? 1 : -1;
 }
 
 std::string vniTypeString(const std::string& keys, VniConfig cfg) {
