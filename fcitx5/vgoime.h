@@ -27,7 +27,12 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(VgoMethod, N_("Telex"), N_("VNI"));
 FCITX_CONFIGURATION(
     VgoConfig,
     fcitx::OptionWithAnnotation<VgoMethod, VgoMethodI18NAnnotation> method{
-        this, "InputMethod", "Kiểu gõ", VgoMethod::Telex};);
+        this, "InputMethod", "Kiểu gõ", VgoMethod::Telex};
+    // Chromium/Electron mặc định ép preedit (xoá chữ lỗi trên GNOME). KDE Wayland
+    // (KWin text-input) có thể xoá được -> cho người dùng bật thử.
+    fcitx::Option<bool> chromiumNoPreedit{
+        this, "ChromiumNoPreedit",
+        "Không gạch chân trong Chrome/Slack/VS Code (thử nghiệm)", false};);
 
 // Trạng thái soạn thảo riêng từng ô nhập.
 class VgoState : public fcitx::InputContextProperty {

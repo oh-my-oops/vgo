@@ -215,9 +215,10 @@ std::string VgoEngine::subModeLabelImpl(const InputMethodEntry &, InputContext &
 // hoặc fallback preedit nếu app không hỗ trợ surrounding text.
 void VgoEngine::render(InputContext *ic, VgoState *state) {
     std::string next = state->display();
-    // Chromium/Electron: surrounding-text xoá lỗi -> dùng preedit (else-branch).
+    // Chromium/Electron: surrounding-text xoá lỗi -> dùng preedit (else-branch),
+    // trừ khi người dùng bật thử "không gạch chân" (chạy được trên KDE Wayland).
     bool canCommit = ic->capabilityFlags().test(CapabilityFlag::SurroundingText) &&
-                     !isChromiumApp(ic->program());
+                     (!isChromiumApp(ic->program()) || *config_.chromiumNoPreedit);
     if (canCommit) {
         size_t offB = 0;
         int common = commonPrefixCp(state->shown, next, offB);
