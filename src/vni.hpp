@@ -20,7 +20,7 @@ public:
 
     void key(char c);          // nạp 1 phím ASCII (chữ hoặc số)
     void backspace();          // lùi đúng 1 phím thô
-    void reset() { buf_.clear(); raw_.clear(); flipped_ = false; }
+    void reset() { buf_.clear(); raw_.clear(); flipped_ = false; strayDigit_ = false; }
     void flip() { flipped_ = !flipped_; }   // Esc: lật thô <-> tiếng Việt (không ghi nhớ)
 
     bool empty() const { return raw_.empty(); }
@@ -33,6 +33,7 @@ private:
     std::u32string buf_;       // buffer đã biến đổi
     std::string raw_;          // phím thô đã gõ
     bool flipped_ = false;
+    bool strayDigit_ = false;  // có số không thành dấu được ("i18n": 8) -> không phải từ Việt
 
     void appendLiteral(char c);
     void normalizeTone();

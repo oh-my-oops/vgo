@@ -45,7 +45,10 @@ void VniEngine::key(char c) {
     raw_ += c;
     if (c >= '0' && c <= '9') {
         // Đã có số thô trong từ ("h264", "a1" sau hoàn tác) -> số tiếp theo cũng thô.
-        if (hasDigit(buf_) || !applyDigit(c - '0', c)) appendLiteral(c);
+        if (hasDigit(buf_) || !applyDigit(c - '0', c)) {
+            appendLiteral(c);
+            strayDigit_ = true;
+        }
         return;
     }
     appendLiteral(c);
@@ -245,8 +248,10 @@ bool VniEngine::isShowingRaw() const {
     // ("a5" -> "ạ" thì vẫn Việt: "vâng ạ".)
     bool raw = (raw_ == "a4" || raw_ == "A4");
     // Số đã thành dấu nhưng chữ gõ SAU làm hỏng âm tiết ("ma3"+"t" = "mảt") -> thô,
-    // như UniKey. Có số thô trong buf_ ("a11" -> "a1") thì người gõ đã chọn rồi, để yên.
-    if (!raw && raw_.find_first_of("0123456789") != std::string::npos && !hasDigit(buf_)) {
+    // như UniKey. Có số thô trong buf_ do gõ lặp hoàn tác ("a11" -> "a1") thì người gõ đã
+    // chọn rồi, để yên; còn số không thành dấu được ("i18n": "í"+"8") thì -> thô.
+    if (!raw && raw_.find_first_of("0123456789") != std::string::npos &&
+        (!hasDigit(buf_) || strayDigit_)) {
         int start, end;
         lastVowelRun(buf_, start, end);
         bool closed = end >= 0 && end < (int)buf_.size() - 1;

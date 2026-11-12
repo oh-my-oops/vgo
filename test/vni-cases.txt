@@ -24,6 +24,7 @@ D4|hoa2 khoe3 thuy3 hoa8c5|hòa khỏe thủy hoặc
 # E — số thật / mã kỹ thuật: KHÔNG thành dấu
 E1|2026 100 1.5 12:30 11/11/2026|2026 100 1.5 12:30 11/11/2026
 E2|h264 mp3 win10 covid19 iphone15|h264 mp3 win10 covid19 iphone15
+E3|i18n l10n k8s i18n|i18n l10n k8s i18n
 E3|user1 test1 room2 html5 ipv6 x86|user1 test1 room2 html5 ipv6 x86
 E4|4g 5g 3d 2fa km2 ver1.2|4g 5g 3d 2fa km2 ver1.2
 E5|a4 A4 F1 MP3|a4 A4 F1 MP3
