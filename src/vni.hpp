@@ -20,14 +20,27 @@ public:
 
     void key(char c);          // nạp 1 phím ASCII (chữ hoặc số)
     void backspace();          // lùi đúng 1 phím thô
-    void reset() { buf_.clear(); raw_.clear(); flipped_ = false; strayDigit_ = false; }
-    void flip() { flipped_ = !flipped_; }   // Esc: lật thô <-> tiếng Việt (từ này)
+    void reset() { buf_.clear(); raw_.clear(); flipped_ = false; strayDigit_ = false;
+                   noCorrect_ = false; }
+    void flip();               // Esc: lật thô <-> tiếng Việt (từ này); bản tự sửa -> phím thô
     // App đang gõ: lựa chọn Esc riêng của app thắng lựa chọn chung (xem learn.hpp).
     void setApp(const std::string& app) { app_ = app; }
+
+    // Ngữ cảnh (như Telex): chốt từ đang gõ trước ranh giới `boundary` (0 = không có)
+    // rồi reset(). "giấy a4": tới lúc gõ "a4" thì prev() == "giấy".
+    void endWord(char32_t boundary);
+    void clearContext() { tok_.clear(); prev_.clear(); }
+    const std::string& prev() const { return prev_; }
 
     bool empty() const { return raw_.empty(); }
     const std::string& raw() const { return raw_; }
     bool isShowingRaw() const;
+    bool isCorrected() const;  // đang hiện bản tự sửa theo lỗi gõ riêng (typoLookup "vni")
+    bool showingVN() const { return isCorrected() || !isShowingRaw(); }
+    // Từ "hỏng": có số không thành dấu được / làm hỏng âm tiết, chưa Esc, chưa học, chưa
+    // tự sửa. Người gõ xoá từ hỏng rồi gõ lại đúng -> học lỗi gõ (tầng fcitx).
+    bool rejected() const;
+    bool complete() const;     // âm tiết Việt TRỌN hợp lệ (không còn số thô)
     std::string display() const;            // chuỗi để hiện ra (UTF-8)
 
 private:
@@ -37,6 +50,12 @@ private:
     bool flipped_ = false;
     bool strayDigit_ = false;  // có số không thành dấu được ("i18n": 8) -> không phải từ Việt
     std::string app_;          // app đang gõ, "" = không rõ
+    bool noCorrect_ = false;   // Esc trên bản tự sửa -> hiện phím thô
+    std::string tok_, prev_;   // token đang gõ (phần đã chốt) / token trước
+
+    bool rulesRaw() const;     // luật cấu trúc: số làm hỏng âm tiết -> thô
+    int learned() const;       // đã học: ngữ cảnh > riêng app > chung. 1 thô, -1 Việt, 0 chưa
+    std::string correction() const;  // bản sửa theo lỗi gõ riêng, "" nếu không có
 
     void appendLiteral(char c);
     void normalizeTone();

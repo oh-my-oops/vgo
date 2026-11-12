@@ -218,9 +218,9 @@ int main() {
                                        tag, keys, got.c_str(), want); }
         };
         expect("kohng", "kohng", "chưa học");      // mô hình chung không sửa đảo phím
-        typoNote("kohng", "khoong");
+        typoNote("telex", "kohng", "khoong");
         expect("kohng", "kohng", "1 lần");         // 1 lần = lỡ tay, chưa sửa
-        typoNote("kohng", "khoong");
+        typoNote("telex", "kohng", "khoong");
         expect("kohng", "không", "2 lần");         // thói quen -> sửa
         expect("Kohng", "Không", "hoa");
         expect("tooi kohng ddi", "tôi không đi", "câu");

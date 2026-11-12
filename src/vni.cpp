@@ -87,7 +87,7 @@ bool VniEngine::applyDigit(int d, char typed) {
     int start, end;
     lastVowelRun(buf_, start, end);
     closed = end >= 0 && end < (int)buf_.size() - 1;
-    if (!plausible(buf_) || (closed && !complete(buf_, cfg_.oldStyleTone)) || !ooOk(buf_)) {
+    if (!plausible(buf_) || (closed && !core::complete(buf_, cfg_.oldStyleTone)) || !ooOk(buf_)) {
         buf_ = save;
         return false;
     }
@@ -246,7 +246,7 @@ void VniEngine::backspace() {
     for (char c : r) key(c);               // dựng lại từ phím còn lại
 }
 
-bool VniEngine::isShowingRaw() const {
+bool VniEngine::rulesRaw() const {
     // "a4"/"A4" (khổ giấy): "ã" đứng một mình không phải từ -> giữ thô.
     // ("a5" -> "ạ" thì vẫn Việt: "vâng ạ".)
     bool raw = (raw_ == "a4" || raw_ == "A4");
@@ -258,22 +258,72 @@ bool VniEngine::isShowingRaw() const {
         int start, end;
         lastVowelRun(buf_, start, end);
         bool closed = end >= 0 && end < (int)buf_.size() - 1;
-        raw = !plausible(buf_) || (closed && !complete(buf_, cfg_.oldStyleTone));
+        raw = !plausible(buf_) || (closed && !core::complete(buf_, cfg_.oldStyleTone));
     }
-    // Đã từng Esc từ này: riêng app này trước, rồi tới lựa chọn chung.
+    return raw;
+}
+
+int VniEngine::learned() const {
     std::string low = raw_;
     for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
-    int learned = appGet(app_, "vni", low);
-    if (!learned) learned = vniLookup(low);
-    if (learned) raw = learned > 0;
+    std::string pl = prev_;
+    for (char& ch : pl) ch = (char)std::tolower((unsigned char)ch);
+    if (int c = ctxGet("vni", pl, low)) return c;      // ngữ cảnh: "giấy a4"
+    if (int a = appGet(app_, "vni", low)) return a;    // Esc riêng của app này
+    return vniLookup(low);                             // Esc chung
+}
+
+bool VniEngine::isShowingRaw() const {
+    int l = learned();
+    bool raw = l ? l > 0 : rulesRaw();
     return flipped_ ? !raw : raw;
 }
 
+std::string VniEngine::correction() const {
+    if (noCorrect_ || raw_.empty()) return "";
+    std::string fix = typoLookup("vni", raw_);
+    if (fix.empty()) return "";
+    if (std::isupper((unsigned char)raw_[0])) fix[0] = (char)std::toupper((unsigned char)fix[0]);
+    VniEngine e(cfg_);
+    for (char c : fix) e.key(c);
+    return e.rulesRaw() ? "" : e.display();
+}
+
+bool VniEngine::isCorrected() const {
+    return !flipped_ && !learned() && rulesRaw() && !correction().empty();
+}
+
+bool VniEngine::rejected() const {
+    return !flipped_ && !learned() && rulesRaw() && correction().empty() &&
+           raw_.size() >= 2;
+}
+
+bool VniEngine::complete() const {
+    return !hasDigit(buf_) && core::complete(buf_, cfg_.oldStyleTone);
+}
+
+void VniEngine::flip() {
+    if (isCorrected()) noCorrect_ = true;   // Esc trên bản tự sửa -> về đúng phím thô
+    else flipped_ = !flipped_;
+}
+
 std::string VniEngine::display() const {
+    if (isCorrected()) return correction();
     if (isShowingRaw()) return raw_;
     std::string out;
     for (char32_t c : spellFix(buf_, cfg_.oldStyleTone)) encodeOne(out, c);
     return out;
+}
+
+void VniEngine::endWord(char32_t boundary) {
+    tok_ += display();
+    reset();
+    if (boundary == ' ' || boundary == '\t' || boundary == '\n' || boundary == 0) {
+        if (!tok_.empty()) prev_ = tok_;
+        tok_.clear();
+    } else {
+        encodeOne(tok_, boundary);
+    }
 }
 
 namespace {
@@ -312,7 +362,7 @@ std::string vniTypeString(const std::string& keys, VniConfig cfg) {
             e.key(ch);
         } else {
             out += e.display();
-            e.reset();
+            e.endWord((unsigned char)ch);
             out += ch;
         }
     }

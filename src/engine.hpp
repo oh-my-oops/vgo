@@ -113,15 +113,6 @@ void bigramLoadFile(const std::string& path);
 // 1 = Anh, -1 = Việt, 0 = không có luật
 int bigramLookup(const std::string& prev, const std::string& raw);
 
-// ---- LỖI GÕ RIÊNG (tự học thói quen): phím gõ sai -> phím gõ lại cho đúng ----
-// Người gõ xoá một từ không ra tiếng Việt rồi gõ lại thành âm tiết đúng -> ghi 1 lần.
-// Gặp đủ TYPO_MIN lần (thói quen, không phải lỡ tay) thì tự sửa như tự sửa gõ nhầm.
-constexpr int TYPO_MIN = 2;
-bool typoLearnable(const std::string& bad, const std::string& good);  // đủ gần để là lỗi gõ?
-void typoNote(const std::string& bad, const std::string& good);       // ghi 1 lần gặp
-void typoLoadFile(const std::string& path);      // mỗi dòng "sai đúng" = 1 lần gặp
-std::string typoLookup(const std::string& bad);  // phím đúng, "" = chưa đủ lần / không có
-
 // Tiện ích cho test/CLI: nạp cả chuỗi phím, tự commit khi gặp ký tự không phải chữ.
 std::string typeString(const std::string& keys, Config cfg = {});
 

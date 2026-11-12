@@ -42,9 +42,9 @@ Gỡ: `./uninstall.sh` (chỉ gỡ bộ gõ của gói này).
 | Học gì | Khi nào | File |
 |---|---|---|
 | Lật Anh/Việt (Telex) | Esc khi đang gõ dở | `words.txt`, `vn-words.txt`, `bigram.txt` |
-| Lật thô/Việt (VNI) | Esc khi đang gõ dở từ có số (`a4` -> `ã`) | `vni-raw.txt`, `vni-vn.txt` |
+| Lật thô/Việt (VNI) | Esc khi đang gõ dở từ có số (`a4` -> `ã`). Đầu câu thì nhớ cả từ; có từ trước thì chỉ nhớ đúng cặp (`giấy a4`) | `vni-raw.txt`, `vni-vn.txt`, `vni-bigram.txt` |
 | Riêng từng app | Esc như trên: app nhớ lựa chọn của nó, thắng lựa chọn chung | `apps/<tên app>.txt` |
-| Lỗi gõ quen tay (Telex) | Gõ ra chữ không phải tiếng Việt, xoá rồi gõ lại đúng. Đủ 2 lần thì tự sửa | `typos.txt` (mỗi dòng 1 lần) |
+| Lỗi gõ quen tay | Gõ ra chữ không phải tiếng Việt, xoá rồi gõ lại đúng. Đủ 2 lần thì tự sửa (Esc trên bản tự sửa = về đúng phím đã gõ) | Telex: `typos.txt`, VNI: `vni-typos.txt` (mỗi dòng 1 lần) |
 
 Lựa chọn chung = lần Esc gần nhất ở bất kỳ app nào. Học sai: xoá dòng trong file rồi
 `pkill -x fcitx5` (fcitx5 tự chạy lại) để nạp lại.
