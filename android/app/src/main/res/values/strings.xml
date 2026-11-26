@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">vgo Keyboard</string>
+    <string name="ime_name">vgo (Anh–Việt)</string>
+    <string name="subtype_vi">Tiếng Việt (vgo)</string>
+    <string name="subtype_en">English (vgo)</string>
+</resources>

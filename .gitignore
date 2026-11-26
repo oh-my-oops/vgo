@@ -8,3 +8,17 @@ vni-test
 mklex
 *.o
 *.so
+
+# Android build artifacts
+android/.gradle/
+android/.idea/
+android/local.properties
+android/build/
+android/app/build/
+android/app/.cxx/
+android/app/src/main/cpp/build-host/
+*.apk
+*.aab
+*.keystore
+*.jks
+android/.kotlin/

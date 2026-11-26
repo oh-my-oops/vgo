@@ -1,0 +1,10 @@
+vgo word prediction data (built by android/tools/build_predict.py, 2026-11-26)
+
+vi.txt: n-gram counts from
+  - Leipzig Corpora Collection: vie_news_2022_1M, vie-vn_web_2015_1M (CC BY 4.0)
+    D. Goldhahn, T. Eckart, U. Quasthoff (2012), LREC 2012. https://wortschatz-leipzig.de
+  - OPUS OpenSubtitles v2018 Vietnamese monolingual (https://opus.nlpl.eu, opensubtitles.org)
+    P. Lison, J. Tiedemann (2016), LREC 2016.
+en.txt: n-gram counts from Leipzig eng_news_2024_1M, eng-com_web-public_2018_1M,
+  the first 4M lines of OPUS OpenSubtitles v2018 English, word list filtered by
+  HeliBoard aosp-dictionaries main_en_US (CC BY 4.0, https://codeberg.org/Helium314/aosp-dictionaries).

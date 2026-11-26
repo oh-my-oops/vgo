@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two subtypes, like Gboard languages: the system globe button (nav bar / IME switcher menu)
+  switches between them even when vgo is the only enabled IME. The service maps each subtype to
+  the vgo Vietnamese on/off state (see VgoInputMethodService.onCurrentInputMethodSubtypeChanged).
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.vgo.ime.settings.SettingsActivity"
+    android:supportsInlineSuggestions="true"
+    android:supportsSwitchingToNextInputMethod="true">
+
+    <subtype
+        android:subtypeId="0x76676f01"
+        android:imeSubtypeLocale="vi_VN"
+        android:languageTag="vi-VN"
+        android:imeSubtypeMode="keyboard"
+        android:imeSubtypeExtraValue="vgo_lang=vi"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_vi" />
+
+    <subtype
+        android:subtypeId="0x76676f02"
+        android:imeSubtypeLocale="en_US"
+        android:languageTag="en-US"
+        android:imeSubtypeMode="keyboard"
+        android:imeSubtypeExtraValue="vgo_lang=en"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_en" />
+</input-method>

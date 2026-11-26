@@ -1,5 +1,30 @@
 # vgo — bộ gõ tiếng Việt (tự build)
 
+> **Tác giả gốc:** [Peter (@peteronnxsys)](https://github.com/peteronnxsys) —
+> repo gốc [peteronnxsys/vgo](https://github.com/peteronnxsys/vgo). Toàn bộ lõi gõ
+> (Telex, đặt dấu, auto Anh–Việt, Esc lật + tự học, tự sửa gõ nhầm) và addon fcitx5
+> là của Peter. Bản này gộp Telex + VNI thành một bộ gõ, thêm tự học cho VNI và
+> **app Android** (thư mục [`android/`](android/)).
+>
+> Cảm ơn Peter đã viết vgo và chia sẻ mã nguồn — một bộ gõ gọn, nhanh, hiểu đúng cách
+> người Việt gõ lẫn tiếng Anh mỗi ngày. 🙏
+
+## Android (bàn phím cho tablet)
+
+App `android/` dùng chung lõi C++ ở `src/` (qua JNI), giao diện kiểu Gboard tablet:
+
+- Telex cho bàn phím cảm ứng, VNI cho bàn phím rời (lưu riêng theo nguồn phím);
+  tự ẩn khi gắn bàn phím cứng; Ctrl+Shift đổi Việt/Anh; nút 🌐 đổi qua lại
+  (2 subtype Tiếng Việt / English).
+- Gõ không gạch chân, clipboard kiểu Gboard (ghim, tự xoá sau 1 giờ, dán cả ảnh),
+  tự điền mật khẩu inline (Bitwarden…), emoji, bảng sửa văn bản.
+- **Gợi ý từ + đoán từ tiếp theo**: số ô gợi ý tự tính theo bề rộng màn hình (bật/tắt
+  trong cài đặt), học từ người dùng hay gõ (không học ở ô mật khẩu/ẩn danh).
+
+Build: `cd android && ./gradlew assembleRelease` (JDK 17, Android SDK + NDK).
+Dữ liệu gợi ý (`android/app/src/main/assets/predict/`) dựng lại bằng
+`android/tools/build_predict.py` — xem nguồn ở mục *Tham khảo*.
+
 Bộ gõ tiếng Việt cho Linux/fcitx5, viết từ đầu. Tách 2 lớp:
 
 - **Lõi chữ Việt** (`src/viet.{hpp,cpp}`) — bảng dấu, đặt thanh, kiểm âm tiết; dùng
@@ -164,3 +189,7 @@ UniKey/phone/Lotus) → "thoát" từ có dấu về thô. Lỡ tay thì **Backs
   `InputLogic.revertCommit` (Backspace hoàn tác). Nguồn cho tự sửa gõ nhầm.
 - [FrequencyWords](https://github.com/hermitdave/FrequencyWords) — `vi_50k.txt`
   (OpenSubtitles, CC-BY-SA-4.0) → `data/vn-syllables.txt`.
+- Dữ liệu gợi ý từ trên Android (`android/app/src/main/assets/predict/SOURCES.txt`):
+  [Leipzig Corpora Collection](https://wortschatz-leipzig.de) (CC BY 4.0),
+  [OPUS OpenSubtitles v2018](https://opus.nlpl.eu/OpenSubtitles/corpus/version/OpenSubtitles),
+  danh sách từ tiếng Anh của [HeliBoard aosp-dictionaries](https://codeberg.org/Helium314/aosp-dictionaries) (CC BY 4.0).
