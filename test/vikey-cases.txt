@@ -28,6 +28,11 @@ C6|em sex optimize|em sẽ optimize
 C7|thanks aj|thanks ạ
 C8|ddc|đc
 C9|ddt|đt
+C10|nuts|nút
+C11|conf nhieeuf|còn nhiều
+C12|songs bieenr|sóng biển
+C13|hats hay|hát hay
+C14|caps sacj|cáp sạc
 # D — số dính chữ
 D1|5trawm|5trăm
 D2|mua 1casi|mua 1cái
