@@ -1,14 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 12 50 50">
-  <g fill="#B7C064" stroke="#B7C064" stroke-linecap="round" stroke-linejoin="round">
-    <!-- legs -->
-    <path d="M25,43 L24,54 M21,56 L24,54 L27,56" stroke-width="2.4" fill="none"/>
-    <path d="M33,43 L34,54 M31,56 L34,54 L37,56" stroke-width="2.4" fill="none"/>
-    <!-- thin curved beak (stroke), drooping to lower-right -->
-    <path d="M44,26 Q53,28 60,35" stroke-width="2.6" fill="none"/>
-    <!-- body: egg, fat rear (left), narrowing to head (right) -->
-    <path d="M14,38 C11,26 18,16 30,16 C40,16 45,20 45,26
-             C45,32 42,40 33,44 C24,47 16,45 14,38 Z" stroke="none"/>
-    <!-- eye (dark dot on light body) -->
-    <circle cx="40" cy="24" r="1.6" fill="#3E4522" stroke="none"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="2 3 62 62" width="512" height="512">
+<title>vgo · Kiwi ô liu</title>
+<path fill="#B7C064" stroke="#333B22" stroke-width="2.3" stroke-linejoin="round" d="M4 39Q8 18 26 18Q32 18 35 20Q40 12 47 15Q53 17 53 25L62 39L49 33Q45 43 34 47L34 54H28L27 48H22L19 54H13L15 46Q7 45 4 39Z"/>
+<path fill="#333B22" d="M11 36Q18 35 31 26Q28 40 15 40Z"/>
+<circle cx="46" cy="23" r="2.7" fill="#333B22"/>
 </svg>
