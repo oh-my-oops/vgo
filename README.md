@@ -9,6 +9,24 @@
 > Cảm ơn Peter đã viết vgo và chia sẻ mã nguồn — một bộ gõ gọn, nhanh, hiểu đúng cách
 > người Việt gõ lẫn tiếng Anh mỗi ngày. 🙏
 
+## Giấy phép
+
+[![CC BY-NC-SA 4.0](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.vi)
+
+Mã nguồn vgo (lõi C++, addon fcitx5, app Android, script) theo
+**[CC BY-NC-SA 4.0](LICENSE)** — © 2026 Peter (@peteronnxsys) và Hồ Thái Thăng (@thangho98):
+
+- **BY** — dùng lại phải ghi công tác giả và dẫn link repo gốc.
+- **NC** — **không dùng cho mục đích thương mại** (không bán, không đưa vào sản phẩm/dịch vụ thu tiền).
+- **SA** — bản sửa đổi phải phát hành **cùng giấy phép** này (công khai mã nguồn của bản sửa).
+
+Ngoại lệ — file của bên thứ ba giữ giấy phép gốc:
+
+- `data/vn-syllables.txt` — dựng từ FrequencyWords, **CC BY-SA 4.0**.
+- `android/app/src/main/assets/predict/` — dựng từ Leipzig Corpora + HeliBoard (CC BY 4.0)
+  và OPUS OpenSubtitles; nguồn ghi ở `SOURCES.txt` cùng thư mục.
+- `android/gradle/wrapper/` — Gradle Wrapper, Apache-2.0.
+
 ## Android (bàn phím cho tablet)
 
 App `android/` dùng chung lõi C++ ở `src/` (qua JNI), giao diện kiểu Gboard tablet:
