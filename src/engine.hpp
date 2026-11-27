@@ -28,7 +28,7 @@ public:
 
     void key(char c);          // nạp 1 phím ASCII
     void backspace();          // xoá 1 ký tự cuối
-    void reset() { buf_.clear(); raw_.clear(); forcedRaw_ = false; forcedVN_ = false; }
+    void reset() { buf_.clear(); raw_.clear(); forcedRaw_ = false; forcedVN_ = false; undoAt_ = -1; }
     // App đang gõ (tên chương trình): lựa chọn Esc riêng của app thắng lựa chọn chung.
     void setApp(const std::string& app) { app_ = app; }
 
@@ -64,6 +64,11 @@ private:
     std::string raw_;          // phím thô đã gõ (cho fallback tiếng Anh)
     bool forcedRaw_ = false;   // Esc đã ép từ này về thô (Anh)
     bool forcedVN_ = false;    // Esc đã ép từ này về tiếng Việt
+    // Vị trí (trong raw_) phím dấu gõ đúp đã gỡ dấu lúc từ đang hiện tiếng Việt, -1 = không.
+    // Như UniKey: "diss" -> "dis", "disscuss" -> "discuss" (phím đúp chỉ để gỡ dấu, không in ra).
+    int undoAt_ = -1;
+    bool undoHit_ = false;     // handleTone vừa gỡ dấu do gõ đúp (key() đọc rồi xoá)
+    int lexicalVerdict() const;  // +1 thô / -1 Việt theo Esc, từ điển, ngữ cảnh; 0 = chưa rõ
     std::string tok_;          // token hiện tại (phần đã chốt, chưa gặp khoảng trắng)
     std::string prev_;         // token trước (đã gặp khoảng trắng)
     std::string tokRaw_, prevRaw_;  // như trên nhưng là phím thô ("has" dù đã hiện "há")

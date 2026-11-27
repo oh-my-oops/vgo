@@ -52,6 +52,7 @@ bool Engine::handleTone(int tone, char typed) {
         buf_[curPos] = compose(d.base, d.mod, T_NONE, d.upper);
         appendLiteral(typed);
         normalizeTone();
+        undoHit_ = true;
         return true;
     }
     if (curPos >= 0) {                    // gỡ dấu cũ
@@ -216,13 +217,20 @@ bool Engine::handleDStroke(char typed) {
 }
 
 void Engine::key(char c) {
+    char lc = (char)std::tolower((unsigned char)c);
+    bool tone = lc == 's' || lc == 'f' || lc == 'r' || lc == 'x' || lc == 'j';
+    // Gõ đúp phím dấu chỉ "nuốt" phím khi từ đang hiện tiếng Việt ("dí"+s -> "dis");
+    // đang hiện thô ("discu"+s) thì phím vẫn là chữ thường.
+    bool wasVN = tone && undoAt_ < 0 && !raw_.empty() && !isShowingRaw();
     raw_ += c;   // lưu phím thô để fallback tiếng Anh
     if (!std::isalpha((unsigned char)c)) { appendLiteral(c); return; }
-    char lc = (char)std::tolower((unsigned char)c);
     bool handled = false;
     switch (lc) {
         case 's': case 'f': case 'r': case 'x': case 'j':
-            handled = handleTone(toneOf(lc), c); break;
+            undoHit_ = false;
+            handled = handleTone(toneOf(lc), c);
+            if (undoHit_ && wasVN) undoAt_ = (int)raw_.size() - 1;
+            break;
         case 'z':
             handled = handleRemoveTone(c); break;
         case 'w':
@@ -256,6 +264,7 @@ void Engine::backspace() {
     r.pop_back();                        // bỏ ĐÚNG phím thô cuối (kể cả phím lỡ dư)
     raw_.clear();
     buf_.clear();
+    undoAt_ = -1;
     for (char c : r) key(c);             // DỰNG LẠI buf_ + raw_ từ chuỗi phím còn lại
 }                                        // "bị"+lỡ'x'="bĩ" -> backspace -> "bị" (không tụt "bi"/"b")
 
@@ -603,31 +612,42 @@ void Engine::endWord(char32_t boundary) {
 }
 
 // Từ đang gõ sẽ hiện ra dạng thô (Anh) hay bản tiếng Việt?
-bool Engine::isShowingRaw() const {
-    if (forcedRaw_) return true;                         // Esc ép thô
-    if (forcedVN_)  return false;                        // Esc ép Việt
+int Engine::lexicalVerdict() const {
+    if (forcedRaw_) return 1;                            // Esc ép thô
+    if (forcedVN_)  return -1;                           // Esc ép Việt
     std::string low = lower(raw_);
     int b = bigramLookup(prev_, low);                    // ngữ cảnh: "xe bus", "it's been"
     if (!b && prevRaw_ != prev_) b = bigramLookup(prevRaw_, low);  // "has" đã hiện "há"
-    if (b) return b > 0;
-    if (int a = appGet(app_, "telex", low)) return a > 0;  // Esc riêng của app này
-    if (VN_PRIORITY.count(low)) return false;
+    if (b) return b > 0 ? 1 : -1;
+    if (int a = appGet(app_, "telex", low)) return a > 0 ? 1 : -1;  // Esc riêng của app này
+    if (VN_PRIORITY.count(low)) return -1;
     // Từ trước ra Anh + từ này có trong từ điển Anh BASE -> theo Anh, thắng ép-Việt:
     // "is" một mình -> í, nhưng "this is"/"for us" -> Anh. (Không làm chiều ngược:
     // câu Việt hay chen từ Anh — "cần test", "có confirm".) Chỉ base: lớp tự học có
     // lẫn Esc nhầm — "thif" từng kẹt cả 2 file -> "unit test thì" ra "thif".
-    if (prevEn_ && dictBaseContains(low)) return true;
-    if (vnContains(low)) return false;                   // ép Việt
-    if (dictContains(low)) return true;                  // từ điển Anh
+    if (prevEn_ && dictBaseContains(low)) return 1;
+    if (vnContains(low)) return -1;                      // ép Việt
+    if (dictContains(low)) return 1;                     // từ điển Anh
     // Viết tắt IN HOA giữa câu thường ("mua NAS") -> thô. Câu IN HOA toàn bộ
     // ("VIỆT NAM VÀ") / đầu dòng thì vẫn Việt: không có từ trước chữ thường.
-    if (isShortAllCaps(raw_) && hasLower(prev_)) return true;
+    if (isShortAllCaps(raw_) && hasLower(prev_)) return 1;
+    return 0;
+}
+
+// Từ đang gõ sẽ hiện ra dạng thô (Anh) hay bản tiếng Việt?
+bool Engine::isShowingRaw() const {
+    if (int v = lexicalVerdict()) return v > 0;
+    if (undoAt_ >= 0) return true;                       // đã gõ đúp gỡ dấu -> thoát về chữ thường
     if (plausible()) return false;                       // còn lại: theo cấu trúc
     return correction().empty();                         // sửa được 1 lỗi gõ -> Việt
 }
 
 std::string Engine::display() const {
-    return isShowingRaw() ? raw_ : preedit();
+    if (!isShowingRaw()) return preedit();
+    // Thoát bằng phím dấu đúp (không do từ điển/Esc): bỏ phím đúp như UniKey ("diss" -> "dis").
+    if (undoAt_ >= 0 && undoAt_ < (int)raw_.size() && lexicalVerdict() == 0)
+        return raw_.substr(0, undoAt_) + raw_.substr(undoAt_ + 1);
+    return raw_;
 }
 
 std::string typeString(const std::string& keys, Config cfg) {

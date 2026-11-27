@@ -452,8 +452,14 @@ class ImeSessionController(
         }
     }
 
-    fun onSoftEnter(bridge: TextBridge?) {
+    /** [newline]: the user held Shift — break the line instead of Enter, which chat apps
+     *  (PPM, Slack, web chats) treat as "send" while Shift+Enter means a new line. */
+    fun onSoftEnter(bridge: TextBridge?, newline: Boolean = false) {
         if (bridge == null) return
+        if (newline && policy.isMultiline) {
+            onSoftText("\n", bridge)
+            return
+        }
         if (!engine.isEmpty()) {
             finalizeComposing(bridge, 0)
         } else {

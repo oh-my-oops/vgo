@@ -95,6 +95,8 @@ class VgoInputMethodService :
     private var shiftState: ShiftState = ShiftState.OFF
     private var lastSnapshot: EngineSnapshot = EngineSnapshot()
     private var lastShiftTapMs: Long = 0L
+    /** Shift is on because the user tapped it (not auto-capitalisation): Shift+Enter = new line. */
+    private var shiftByUser = false
     private var lastSpaceTapMs: Long = 0L
     private var lastLearnedRevision: Long = 0L
     private var currentEditorInfo: EditorInfo? = null
@@ -462,7 +464,9 @@ class VgoInputMethodService :
             }
             KeyAction.Enter -> {
                 lastSpaceTapMs = 0L
-                controller.onSoftEnter(bridge)
+                val newline = shiftByUser && shiftState != ShiftState.OFF
+                if (newline && shiftState == ShiftState.ONCE) shiftState = ShiftState.OFF
+                controller.onSoftEnter(bridge, newline)
                 updateAutoCap()
                 renderSoftUi()
             }
@@ -472,6 +476,7 @@ class VgoInputMethodService :
             }
             KeyAction.CapsLock -> {
                 shiftState = if (shiftState == ShiftState.CAPS_LOCK) ShiftState.OFF else ShiftState.CAPS_LOCK
+                shiftByUser = shiftState != ShiftState.OFF
                 renderSoftUi()
             }
             KeyAction.Shift -> {
@@ -482,6 +487,7 @@ class VgoInputMethodService :
                     ShiftState.CAPS_LOCK -> ShiftState.OFF
                 }
                 lastShiftTapMs = now
+                shiftByUser = shiftState != ShiftState.OFF
                 renderSoftUi()
             }
             KeyAction.SwitchToSymbols1 -> {
@@ -538,6 +544,7 @@ class VgoInputMethodService :
 
     override fun onShiftLongPress() {
         shiftState = if (shiftState == ShiftState.CAPS_LOCK) ShiftState.OFF else ShiftState.CAPS_LOCK
+        shiftByUser = shiftState != ShiftState.OFF
         renderSoftUi()
     }
 
@@ -801,6 +808,7 @@ class VgoInputMethodService :
 
     private fun updateAutoCap() {
         if (currentPage != KeyboardPage.ALPHA || shiftState == ShiftState.CAPS_LOCK) return
+        shiftByUser = false
         val settings = controller.currentSettings()
         val policy = controller.currentPolicy()
         if (!settings.autoCap || policy.bypassVietnamese) {

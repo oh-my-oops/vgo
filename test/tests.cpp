@@ -64,11 +64,14 @@ static const std::vector<Case> CASES = {
     {"tieng", "tiêng"}, {"thuongwr", "thưởng"},          // 'w' gõ sau vẫn thắng uô
     // --- gõ đúp phím điều khiển ---
     {"aaa", "aa"},      // mũ (aa->â) gõ lần 3: revert -> "aa"
-    {"thijj", "thijj"}, // B (chuẩn Telex): double dấu = bỏ dấu + chữ thật -> "thij" thô; Backspace cứu
+    {"thijj", "thij"},  // như UniKey: dấu đúp = gỡ dấu, phím đúp không in ra; Backspace cứu
+    {"diss", "dis"}, {"disscuss", "discuss"}, {"laff", "laf"}, {"bajjn", "bajn"},
+    {"disss", "diss"},  // phím thứ 3 là chữ thường
+    {"discuss", "discuss"},  // "discu" đã hiện thô -> 2 phím s cuối là chữ thường
     {"ddd", "ddd"},     // "dd" không phải tiền tố phụ âm đầu -> thô
     {"aww", "aww"},     // "aw": coda 'w' không hợp lệ -> thô
     // --- tiếng Anh lẫn lộn: phải GIỮ NGUYÊN (không mangle) ---
-    {"browser", "browser"}, {"file", "file"}, {"password", "password"},
+    {"browser", "browser"}, {"file", "file"},
     {"video", "video"}, {"google", "google"},
     {"internet", "internet"}, {"javascript", "javascript"}, {"email", "email"},
     {"server", "server"}, {"debug", "debug"}, {"folder", "folder"},
@@ -101,6 +104,7 @@ int main() {
     dictAddWord("cos");   // cố tình thêm để chắc VN_PRIORITY vẫn thắng
     dictAddWord("been");  // "been" trong dict Anh...
     vnAddWord("been");    // ...nhưng ép-Việt ưu tiên -> phải ra "bên"
+    for (const char* w : {"miss", "boss", "password", "hurry"}) dictAddWord(w);
     const std::vector<Case> DCASES = {
         {"test", "test"},   // trong dict -> giữ thô, không thành "tét"
         {"this", "this"},   // -> không thành "thí"
@@ -108,6 +112,7 @@ int main() {
         {"cos",  "có"},     // VN_PRIORITY: dù có trong dict vẫn ra "có"
         {"browser", "browser"},  // vẫn bắt theo cấu trúc (không cần dict)
         {"been", "bên"},    // ép-Việt thắng từ điển Anh
+        {"miss", "miss"}, {"boss", "boss"}, {"password", "password"},  // dấu đúp: từ điển Anh thắng "mis"
     };
     for (auto& c : DCASES) {
         std::string got = typeString(c.keys, cfg);
@@ -186,7 +191,8 @@ int main() {
         {"rroof", "rroof"},      // ứng viên "roof" là từ Anh
         {"warns", "warns"},      // biến tố của từ Anh "warn"
         {"xuoowsng", "xuoowsng"},// không xoá nửa cặp oo (đổi dấu -> "xướng" sai)
-        {"hurry", "hurry"}, {"lasso", "lasso"},  // đúp phím thanh sau nguyên âm = hoàn tác Telex
+        {"hurry", "hurry"},      // từ Anh (dict): đúp phím thanh không bị coi là gõ nhầm
+        {"lasso", "laso"},       // ngoài dict: như UniKey, đúp phím thanh = gỡ dấu, phím đúp không in
         {"kohng", "kohng"},      // không sửa đảo phím (đưa 'w'/'s' ra sau nguyên âm -> dấu)
         {"butt", "butt"}, {"abet", "abet"}, {"brats", "brats"}, {"sway", "sway"},
         {"for", "for"},

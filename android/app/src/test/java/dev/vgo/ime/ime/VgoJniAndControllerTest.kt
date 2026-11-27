@@ -129,8 +129,11 @@ class VgoJniAndControllerTest {
             return buf.substring(start, buf.length)
         }
 
+        var enterKeys = 0
+
         override fun sendDownUpKeyEvent(keyCode: Int) {
             if (keyCode == ImeSessionController.KEYCODE_ENTER) {
+                enterKeys++
                 buf.append('\n')
                 onFieldChanged()
             } else if (keyCode == ImeSessionController.KEYCODE_DEL && buf.length > 1) {
@@ -425,6 +428,36 @@ class VgoJniAndControllerTest {
         // Simulate external cursor jump to position 0 -> resets active word state cleanly!
         ctrl.onUpdateSelection(3, 3, 0, 0, -1, -1, spyBridge)
         assertTrue(bridge.isEmpty())
+    }
+
+    @Test
+    fun shiftEnterInMultilineFieldBreaksLineInsteadOfSendingEnter() {
+        val ctrl = newController(VgoSettings())
+        ctrl.onStartInput(EditorPolicy(packageName = "dev.vgo.test.chat", isMultiline = true))
+        val field = FakeAndroidAndRustDeskField()
+        for (ch in "ok") ctrl.onSoftText(ch.toString(), field)
+        ctrl.onSoftEnter(field, newline = true)
+        assertEquals("ok\n", field.localText)
+        assertEquals(0, field.enterKeys)   // no Enter key: the chat app would send the message
+        ctrl.onSoftEnter(field)
+        assertEquals(1, field.enterKeys)
+    }
+
+    @Test
+    fun softTelexDoubleToneKeyUndoesToneLikeUniKey() {
+        val ctrl = newController(VgoSettings())
+        ctrl.onStartInput(EditorPolicy(packageName = "dev.vgo.test.discuss"))
+        // keys -> text: the doubled tone key only removes the tone ("diss" -> "dis"),
+        // English dictionary words keep every key.
+        val cases = listOf(
+            "diss " to "dis ", "disscuss " to "discuss ", "discuss " to "discuss ",
+            "miss " to "miss ", "boss " to "boss ", "class " to "class ",
+        )
+        for ((keys, want) in cases) {
+            val field = FakeAndroidAndRustDeskField()
+            for (ch in keys) ctrl.onSoftText(ch.toString(), field)
+            assertEquals(keys, want, field.localText)
+        }
     }
 
     @Test
